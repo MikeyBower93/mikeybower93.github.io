@@ -1,3 +1,5 @@
+# Fun with Flags (Elixir LiveView)
+
 # Introduction
 Although I could list multiple things that I love about you using Elixir and Phoenix for web development, one thing that really blows me away is how as developers we are being provided with new ways to innovate and solve web development tasks, that can often be difficult to do using regular web development techniques. Whats more, these new tools for innovation (especially in the case of this posts topic) are built on top of robust technology that has existed for a long time now. In this post I will touch on how LiveView and GenServers allow us to do this. 
 
