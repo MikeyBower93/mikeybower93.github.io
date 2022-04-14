@@ -4,7 +4,7 @@
 Although I could list multiple things that I love about you using Elixir and Phoenix for web development, one thing that really blows me away is how as developers we are being provided with new ways to innovate and solve web development tasks, that can often be difficult to do using regular web development techniques. Whats more, these new tools for innovation (especially in the case of this posts topic) are built on top of robust technology that has existed for a long time now. In this post I will touch on how LiveView and GenServers allow us to do this. 
 
 # A Simple Example
-Recently I developed a simple project using Elixir and Phoenix, and wanted to make use of LiveView to see how it can make developing interactive applications a lot easier. To that end, I developed a small website that shows the capital cities of the world, and shows the time in those cities which is updated in real time. I also wanted to make the capital cities searchable as there can be a lot to trawl through. The results of this can be seen here: [https://learning-ec2-1.bower-dev.co.uk/](https://learning-ec2-1.bower-dev.co.uk/) (please note this server is not longer active). 
+Recently I developed a simple project using Elixir and Phoenix, and wanted to make use of LiveView to see how it can make developing interactive applications a lot easier. To that end, I developed a small website that shows the capital cities of the world, and shows the time in those cities which is updated in real time. I also wanted to make the capital cities searchable as there can be a lot to trawl through.
 
 Although this example is very crude, as you likely wouldn't do real time updates of times at a fast rate using LiveView, its a good demonstration of what can be done. Additionally, the time can jump occasionally, this is mainly due to the way the time is getting updated in the backend, it is nonetheless good for demonstration purposes. 
 
@@ -13,7 +13,7 @@ Initially when I started, I updated the time in the LiveView processes, however 
 
 Luckily GenServers give us the ability to have a robust process continuously running at a fast rate, whilst giving clients the ability to request the central state of that GenServer process, what is so great about this is not only how robust GenServers are, but how simple they are to write, for example:
 ```elixir
-defmodule LearningEc21.TimeZones do
+defmodule LiveClocks.TimeZones do
   use GenServer
 
   @init_time_zones [
@@ -84,11 +84,11 @@ This is a job that runs every half second, that simply goes through a list of ca
 ## LiveView
 The code that interacts with the browser using LiveView is similarly simple and effective. Which looks like this:
 ```elixir
-defmodule LearningEc21Web.LiveView.Clocks do
+defmodule LiveClocksWeb.LiveView.Clocks do
   use Phoenix.LiveView
   use Phoenix.HTML
 
-  alias LearningEc21.TimeZones
+  alias LiveClocks.TimeZones
 
   @update_period_in_milliseconds 100
 
@@ -194,6 +194,6 @@ As I stated in the introduction, this is an example that you aren't very likely 
 
 I love how the full Elixir stack (Phoenix, Erlang, OTP) is allowing us to develop great features as developers with less code and effort, whilst being able to trust the technology it runs on given the mature OTP platform. 
 
-If you would like see the full code base for this the GitHub repository is: [https://github.com/MikeyBower93/learning-ec2-1](https://github.com/MikeyBower93/learning-ec2-1)
+If you would like see the full code base for this the GitHub repository is: [https://github.com/MikeyBower93/live_clocks](https://github.com/MikeyBower93/live_clocks)
 
 Happy Coding!
