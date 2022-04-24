@@ -1,6 +1,19 @@
 remote_theme: minima
 plugins:
 - jekyll-remote-theme # add this line to the plugins list if you already have one
-- jekyll-mermaid
+- jekyll-spaceship
 minima:
   skin: dark
+
+jekyll-spaceship:
+  processors: 
+    - mermaid-processor  
+  mermaid-processor:
+    mode: default  # mode value 'pre-fetch' for fetching image at building stage
+    css:
+      class: mermaid
+    syntax:
+      code: 'mermaid'
+    config:
+      theme: default
+    src: https://mermaid.ink/svg/
