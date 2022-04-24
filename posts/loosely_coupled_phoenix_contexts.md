@@ -24,20 +24,11 @@ In this example, the architecture can be formalised as 2 Phoenix Contexts which 
 
 The major problem here is how we keep this cohesive. As we now know the "Payments" context gets transactions from a payment processor and parses them into our system, however this means we need to create expenses off the back of these transactions. However its a bad design decision to have the "Payments" context call the "Expenses" context for the reasons explained earlier. It is not a problem for "Expenses" to call "Payments", becauses "Expenses" implies transactions, but "Payments" do not imply expenses. If we ended up coupling these context the following would happen:
 
-```mermaid
-flowchart LR
-    Payments --> PaymentProcessor
-    Payments --> Expenses
-    Expenses --> Payments
-```
+![](/images/loosely_coupled_1.png)
 
 As seen above, we can see that there is tight coupling between the payments and expenses contexts, however what we desire is this:
 
-```mermaid
-flowchart LR
-    Payments --> PaymentProcessor
-    Expenses --> Payments
-```
+![](/images/loosely_coupled_2.png)
 
 How can we solve this since we need to be aware of transactions being created in the "Payments" context within the "Expenses" context?.
 
@@ -55,13 +46,7 @@ One of the reasons I point this out is you might think "could I use the PubSub m
 
 The repo will give you the full picture of how this works, however here are some key highlights, starting with the architecture.
 
-```mermaid
-flowchart LR
-    Payments-->PaymentsProcessor
-    Payments--TransactionsCreated-->Kafka
-    Expenses-->Payments
-    Expenses--TransactionsCreatedSubscription-->Kafka
-```
+![](/images/loosely_coupled_3.png)
 
 **Payments Context**
 
