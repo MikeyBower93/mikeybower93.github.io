@@ -30,7 +30,7 @@ As seen above, we can see that there is tight coupling between the payments and 
 
 ![](/images/loosely_coupled_2.png)
 
-How can we solve this since we need to be aware of transactions being created in the "Payments" context within the "Expenses" context?.
+How can we solve this since we need to be aware of transactions being created in the "Payments" context within the "Expenses" context?
 
 ## Message Queues
 
