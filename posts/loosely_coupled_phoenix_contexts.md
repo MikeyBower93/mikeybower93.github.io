@@ -118,7 +118,7 @@ Similar to the Payments context we can see we have an "expenses" folder which gr
   end
 ```
 
-This is done using `kaffe` and the initialisation can be seen in `config.ex`. This receives Kafka messages for the transactions whenever they are created via the Kafka message queue. This means we can process transactions without creating Payments context coupling.
+This is done using Kaffe and the initialisation can be seen in `config.ex`. This receives Kafka messages for the transactions whenever they are created via the Kafka message queue. This means we can process transactions without creating Payments context coupling.
 
 Finally to demonstrate the logic further, we have an `expenses_controller.ex` which allows expenses to be fetched for a company etc, and also be reviewed by somebody, this is done without any coupling to the "Payment" context.
 
