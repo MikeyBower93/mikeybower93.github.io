@@ -12,21 +12,21 @@ I find that is always best to give concrete examples to illustrate a problem and
 
 At a basic level, companies likely have employees who make expenses which often have to be paid by the company. Historically this has been done using a shared card, of the employee paying with their own money and being reimbursed in their next payslip. This isn't a great experience, so in this example system, we want to a system where companies can be created, along with card holders (employees) and expenses can be stored. And the expenses can either be set as a company expense, or personal expense based on what the purchase was.
 
-To illustrate this example i have created a project called "PayStation" which you can see [here](https://github.com/MikeyBower93/pay_station). 
+To illustrate this example I have created a project called "PayStation" which you can see [here](https://github.com/MikeyBower93/pay_station). 
 
 # PayStation Architecture
 
-In this example, the architecture can be formalised as 2 Phoenix Contexts which are as follows:
+In this example, the architecture can be formalised as 2 Phoenix Contexts which are as follows
 1. "Payments" context, this is a context responsible for anything payment related, in this case its specifically about transactions, and our system being aware of transactions occurring from a payment processor (some external system). This context, should not, and does not have awareness of employees or expenses as its out of its domain, if we were to couple these we would be breaking domain driven design, and if the payments context ever needed to deal with other types of payments that aren't expenses, we would struggle or have to make large changes as it would be coupled to employee expenses.
 2. "Expenses" context, the expenses context is the group logic relating the company expenses, specifically "Companies" -> "Card holders (employees)" -> "Expenses", whereby employees make expenses on behalf of a company, and an expense can be set as a personal expense or company expense when it is reviewed. 
 
 # Whats the Problem?
 
-The major problem here is how we keep this cohesive. As we now know the "Payments" context gets transactions from a payment processor and parses them into our system, however this means we need to create expenses off the back of these transactions. However its a bad design decision to have the "Payments" context call the "Expenses" context for the reasons explained earlier. It is not a problem for "Expenses" to call "Payments", becauses "Expenses" implies transactions, but "Payments" do not imply expenses. If we ended up coupling these context the following would happen:
+The major problem here is how we keep this cohesive. As we now know the "Payments" context gets transactions from a payment processor and parses them into our system, however this means we need to create expenses off the back of these transactions. However its a bad design decision to have the "Payments" context call the "Expenses" context for the reasons explained earlier. It is not a problem for "Expenses" to call "Payments", becauses "Expenses" implies transactions, but "Payments" do not imply expenses. If we ended up coupling these context the following would happen
 
 ![](/images/loosely_coupled_1.png)
 
-As seen above, we can see that there is tight coupling between the payments and expenses contexts, however what we desire is this:
+As seen above, we can see that there is tight coupling between the payments and expenses contexts, however what we desire is this
 
 ![](/images/loosely_coupled_2.png)
 
@@ -50,7 +50,7 @@ The repo will give you the full picture of how this works, however here are some
 
 #### Payments Context
 
-As you can see in the repo we have a "Payments" folder within the "pay_station" directory. This groups all "Payments" based context logic. We have created a "fake" `PaymentProcessor` as follows:
+As you can see in the repo we have a "Payments" folder within the "pay_station" directory. This groups all "Payments" based context logic. We have created a "fake" `PaymentProcessor` as follows
 
 ```elixir
 defmodule PayStation.Payments.External.PaymentProcessor do
@@ -72,7 +72,7 @@ end
 
 This is used to simulate the creation of payments, imagine this being an external payments processor.
 
-We then have a "GenServer" which runs on a 10 second schedule to fetch outstanding payments made, when it retrieves these, it parses them, and puts them on the Kafka queue, the bulk of this can be seen in this function:
+We then have a "GenServer" which runs on a 10 second schedule to fetch outstanding payments made, when it retrieves these, it parses them, and puts them on the Kafka queue, the bulk of this can be seen in this function
 
 ```elixir
   @impl true
@@ -92,7 +92,7 @@ We then have a "GenServer" which runs on a 10 second schedule to fetch outstandi
 
 #### Expenses Context
 
-Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an "expenses_processor" which receives the Kafka messages as follows:
+Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an `expenses_processor` which receives the Kafka messages as follows
 
 ```elixir
 
@@ -122,9 +122,9 @@ This is done using Kaffe and the initialisation can be seen in `config.ex`. This
 
 Finally to demonstrate the logic further, we have an `expenses_controller.ex` which allows expenses to be fetched for a company etc, and also be reviewed by somebody, this is done without any coupling to the "Payment" context.
 
-# Final Notes
+# Conclusions
 
-Firstly, I want to point out that this is quite a crude example used to demonstrate a business case using contexts, and how to use a message queue to solve coupling issues. This by no case means its production ready code, to make this production ready you would need to take into account several things such as:
+Firstly, I want to point out that this is quite a crude example used to demonstrate a business case using contexts, and how to use a message queue to solve coupling issues. This by no case means its production ready code, to make this production ready you would need to take into account several things such as
 - Dead letter queues, for if messages failed to be processed.
 - Idempotency, as you could end up consuming messages more than once, you need to ensure you deal with this fact using things like "upserts".
 - Proper configuration of Kafka, with the right partitions etc.

@@ -11,7 +11,7 @@ Although this example is very crude, as you likely wouldn't do real time updates
 # GenServers
 Initially when I started, I updated the time in the LiveView processes, however I soon realised that this didn't make a great deal of sense, as the time is absolute for anyone on the website so why have every connection updating the time when one place can do it centrally. 
 
-Luckily GenServers give us the ability to have a robust process continuously running at a fast rate, whilst giving clients the ability to request the central state of that GenServer process, what is so great about this is not only how robust GenServers are, but how simple they are to write, for example:
+Luckily GenServers give us the ability to have a robust process continuously running at a fast rate, whilst giving clients the ability to request the central state of that GenServer process, what is so great about this is not only how robust GenServers are, but how simple they are to write, for example
 ```elixir
 defmodule LiveClocks.TimeZones do
   use GenServer
@@ -82,7 +82,7 @@ end
 This is a job that runs every half second, that simply goes through a list of capitals, and updates their time. It also provides a public API `fetch_time_zones()` which calls the GenServer to get the current state of the time zones so LiveView processes can get the current values. Here we can see how GenServers are giving me the ability to have code running in the background frequently, which provides a function for clients to interact with the GenServer, with the great recovery mechanisms baked into OTP for very small amounts of code.
 
 # LiveView
-The code that interacts with the browser using LiveView is similarly simple and effective. Which looks like this:
+The code that interacts with the browser using LiveView is similarly simple and effective. Which looks like this
 ```elixir
 defmodule LiveClocksWeb.LiveView.Clocks do
   use Phoenix.LiveView
