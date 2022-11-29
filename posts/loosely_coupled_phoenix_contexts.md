@@ -36,19 +36,19 @@ How can we solve this since we need to be aware of transactions being created in
 
 A great way is solving this using message queues which uses the "Publish Subscribe" pattern. In so far as the "Payments" context can publish when a transaction has occurred, and other contexts can subscribe to that event, without creating coupling within the "Payments" context. This way if our business cases change or extend in the future, we can easily adapt this by creating additional subscribers etc without touching the "Payments" domain, which in many ways gives us the OCP principle (open closed).
 
-**But What Queue?** 
+### But What Queue?
 
 There are no hard a fast rules on what queue you should use. In the example project I use Kafka, however others are available such as RabbitMQ, Google PubSub etc. However I would highly recommend using an "at least" once queue, this means that it tracks if a consumer has processed a message or not and mantains offsets for this, this is great because it means your system will not miss messages. 
 
 One of the reasons I point this out is you might think "could I use the PubSub mechanism built into Phoenix?". Whilst you could do this, and you would achieve the same desired effect from a design perspective, it might not be the most robust way. Mainly because it is an "at most once" system, which means if your system crashes when processing messages, it will not continue processing those messages when it recovers which could be very bad.
 
-**How Does This look?**
+### How Does This look?
 
 The repo will give you the full picture of how this works, however here are some key highlights, starting with the architecture.
 
 ![](/images/loosely_coupled_3.png)
 
-**Payments Context**
+#### Payments Context
 
 As you can see in the repo we have a "Payments" folder within the "pay_station" directory. This groups all "Payments" based context logic. We have created a "fake" `PaymentProcessor` as follows:
 
@@ -90,7 +90,7 @@ We then have a "GenServer" which runs on a 10 second schedule to fetch outstandi
   end
 ```
 
-**Expenses Context**
+#### Expenses Context
 
 Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an "expenses_processor" which receives the Kafka messages as follows:
 
