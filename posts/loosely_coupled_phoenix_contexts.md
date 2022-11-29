@@ -38,7 +38,7 @@ A great way is solving this using message queues which uses the "Publish Subscri
 
 **But what Queue?** 
 
-There are no hard a fast rules on what queue you should use. In the example project I use kafka, however others are available such as RabbitMQ, Google PubSub etc. However I would highly recommend using an "at least" once queue, this means that it tracks if a consumer has processed a message or not and mantains offsets for this, this is great because it means your system will not miss messages. 
+There are no hard a fast rules on what queue you should use. In the example project I use Kafka, however others are available such as RabbitMQ, Google PubSub etc. However I would highly recommend using an "at least" once queue, this means that it tracks if a consumer has processed a message or not and mantains offsets for this, this is great because it means your system will not miss messages. 
 
 One of the reasons I point this out is you might think "could I use the PubSub mechanism built into Phoenix?". Whilst you could do this, and you would achieve the same desired effect from a design perspective, it might not be the most robust way. Mainly because it is an "at most once" system, which means if your system crashes when processing messages, it will not continue processing those messages when it recovers which could be very bad.
 
@@ -72,7 +72,7 @@ end
 
 This is used to simulate the creation of payments, imagine this being an external payments processor.
 
-We then have a "GenServer" which runs on a 10 second schedule to fetch outstanding payments made, when it retrieves these, it parses them, and puts them on the kafka queue, the bulk of this can be seen in this function:
+We then have a "GenServer" which runs on a 10 second schedule to fetch outstanding payments made, when it retrieves these, it parses them, and puts them on the Kafka queue, the bulk of this can be seen in this function:
 
 ```elixir
   @impl true
@@ -92,7 +92,7 @@ We then have a "GenServer" which runs on a 10 second schedule to fetch outstandi
 
 **Expenses Context**
 
-Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an "expenses_processor" which receives the kafka messages as follows:
+Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an "expenses_processor" which receives the Kafka messages as follows:
 
 ```elixir
 
@@ -118,7 +118,7 @@ Similar to the Payments context we can see we have an "expenses" folder which gr
   end
 ```
 
-This is done using `kaffe` and the initialisation can be seen in `config.ex`. This receives kafka messages for the transactions whenever they are created via the kafka message queue. This means we can process transactions without creating Payments context coupling.
+This is done using `kaffe` and the initialisation can be seen in `config.ex`. This receives Kafka messages for the transactions whenever they are created via the Kafka message queue. This means we can process transactions without creating Payments context coupling.
 
 Finally to demonstrate the logic further, we have an `expenses_controller.ex` which allows expenses to be fetched for a company etc, and also be reviewed by somebody, this is done without any coupling to the "Payment" context.
 
@@ -127,9 +127,9 @@ Finally to demonstrate the logic further, we have an `expenses_controller.ex` wh
 Firstly, I want to point out that this is quite a crude example used to demonstrate a business case using contexts, and how to use a message queue to solve coupling issues. This by no case means its production ready code, to make this production ready you would need to take into account several things such as:
 - Dead letter queues, for if messages failed to be processed.
 - Idempotency, as you could end up consuming messages more than once, you need to ensure you deal with this fact using things like "upserts".
-- Proper configuration of kafka, with the right partitions etc.
+- Proper configuration of Kafka, with the right partitions etc.
 - Tests of course!
 
-Finally, I want to acknowledge and point out that of course including a fully fledged message queue such as kafka creates an overhead of infrastructure maintainance. Although this is getting easier with managed services, to the point where you can even use kafka in `heroku` now, its important for you to balanace the complexity of the project, vs the need for such tools. However its important to note that, Phoenix is often considered a break away from the microservice pattern to a monolith pattern, this is for 2 reasons, one is due to its roots in the ruby community and the "Majestic Monolith" pattern, but also because of the sheer performance cababilities of elixir with OTP. Whilst this is understandable, its important for us to learn from the microservice patterns and what they solve, as it can apply to elixir monoliths aswell as we have just seen. Using something like kafka also means if you did choose to split your elixir services, you will still retain the benefits as it can be used for cross service communication.
+Finally, I want to acknowledge and point out that of course including a fully fledged message queue such as Kafka creates an overhead of infrastructure maintainance. Although this is getting easier with managed services, to the point where you can even use Kafka in Heroku now, its important for you to balanace the complexity of the project, vs the need for such tools. However its important to note that, Phoenix is often considered a break away from the microservice pattern to a monolith pattern, this is for 2 reasons, one is due to its roots in the ruby community and the "Majestic Monolith" pattern, but also because of the sheer performance cababilities of elixir with OTP. Whilst this is understandable, its important for us to learn from the microservice patterns and what they solve, as it can apply to elixir monoliths aswell as we have just seen. Using something like Kafka also means if you did choose to split your elixir services, you will still retain the benefits as it can be used for cross service communication.
 
 Happy coding!
