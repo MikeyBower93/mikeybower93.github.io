@@ -12,9 +12,8 @@ To that end, I ended up creating a library that would parse the request, and gen
 
 This blog will describe how Ecto allowed this to be achieved quite easily. 
 
-## Ecto Composibility
-
-### A Simple Example
+# Ecto Composibility
+## A Simple Example
 One of the things I like the most about Ecto queries is how they are composible, so for example you can create a pipeline to build up a query gradually with small functions, for example:
 ```elixir
 Rocket
@@ -50,7 +49,8 @@ end
 list_rockets({"name" => "Apollo", "age" => 20})
 ```
 In this example we are passing through a map of filters, which are being broken down into a list, which is then used to generated a query using an `Enum.reduce`. 
-### How the Library Uses Composibility
+
+## How the Library Uses Composibility
 The ability to reduce and compose queries is the cornerstone of the JSON API builder I created, it allowed me to parse the parameters, and generate a query off them by reducing over those parameters, an example of this in the library itself would be here:
 ```elixir
 defmodule JsonApiEctoBuilder.Applier.Filter do
@@ -80,7 +80,7 @@ This is a snippet of how the filtering works in the library, a few key points ar
 - We then reduce over the parameters to build up the query, we can see how this is being done in the `do_apply` function, where its basically pattern matching on the operator. 
 - The `do_apply` functions do have a wierd set of binding destructuring, however that will be covered in the next section. 
 
-### How Composibility Allows for Developer Control
+## How Composibility Allows for Developer Control
 Inspired by how Ecto queries work, and the composible nature of them allowing us to only execute the query when the developer is ready was something that I wanted to adopt in the library. So much so that when calling the library to generate a query based on the query parameters, the developer can pass an initial query in, or even amend the query once it has been generated. For example:
 ```elixir
 query = 
@@ -100,8 +100,8 @@ This example should demonstrate a few things:
 - If you have a scenario where the authenticated user might only be able to see particular results, you can use the composible nature of Ecto queries to your advantage, in the above example, when generating the query we set an initial condition where only admins can see secret rockets, otherwise they are hidden. This condition is within the same query that the parameters will be applied to ensure full flexibility of the builder.
 - Even when the builder has done its job and created a query from the parameters, we return the query itself rather than executing it, that way you can decide how you want to use it, for example you might want to paginate; you might want to list all; you may even want to append a select to the query and run an aggregate function on it, that is your call!
 
-## Ecto Named Bindings
-### A Simple Example
+# Ecto Named Bindings
+## A Simple Example
 One other piece that I would like to touch on is how the recent addition of Ecto named bindings made this library possible. To demonstrate this, lets imagine an example with Ecto positional bindings:
 ```elixir
 query =
@@ -135,7 +135,7 @@ This essentially does the following:
 - When I generate the query, I state that each table has an alias (`:rocket`, `:space_center` etc)
 - Then when I go to run a filter on the query, I don't need to know the position of that table, I can simply destructure it with `[space_center: space_center]`.
 
-### How the Library Uses Named Bindings
+## How the Library Uses Named Bindings
 As you can probably see, the problem created by positional bindings would have made the API difficult to develop, as it wouldn't be able to know which table to apply the filter to. Initially how the library works is it checks the filters to see what tables need joining in the query, an example of this can bee seen here: 
 ```elixir
 def apply(query, params, apply_join_callback) do

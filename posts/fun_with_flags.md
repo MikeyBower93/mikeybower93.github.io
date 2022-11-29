@@ -8,7 +8,7 @@ Recently I developed a simple project using Elixir and Phoenix, and wanted to ma
 
 Although this example is very crude, as you likely wouldn't do real time updates of times at a fast rate using LiveView, its a good demonstration of what can be done. Additionally, the time can jump occasionally, this is mainly due to the way the time is getting updated in the backend, it is nonetheless good for demonstration purposes. 
 
-## GenServers
+# GenServers
 Initially when I started, I updated the time in the LiveView processes, however I soon realised that this didn't make a great deal of sense, as the time is absolute for anyone on the website so why have every connection updating the time when one place can do it centrally. 
 
 Luckily GenServers give us the ability to have a robust process continuously running at a fast rate, whilst giving clients the ability to request the central state of that GenServer process, what is so great about this is not only how robust GenServers are, but how simple they are to write, for example:
@@ -81,7 +81,7 @@ end
 ```
 This is a job that runs every half second, that simply goes through a list of capitals, and updates their time. It also provides a public API `fetch_time_zones()` which calls the GenServer to get the current state of the time zones so LiveView processes can get the current values. Here we can see how GenServers are giving me the ability to have code running in the background frequently, which provides a function for clients to interact with the GenServer, with the great recovery mechanisms baked into OTP for very small amounts of code.
 
-## LiveView
+# LiveView
 The code that interacts with the browser using LiveView is similarly simple and effective. Which looks like this:
 ```elixir
 defmodule LiveClocksWeb.LiveView.Clocks do
@@ -188,7 +188,7 @@ A lot of the code here is mainly around general web development stuff, such as t
 - When the the background job periodically updates, it asks the GenServer for the current time zones, this can be seen in the `handle_info(:update, socket)` function. Whats great about this is how efficent LiveView is as when it goes to re render the changes, it only sends new changes, and the packets it sends are very very small. This is why in this example, every time the second changes its able seamlessly update over 200 cities. This is great because this means we now have real time updates going to the browser frequently with very little amount of code, which using other means would have taken a lot of more work.
 - When the user inputs a value into the search field we receive an event `handle_event` where we can parse out the query, at that point we put it in the URL (this means if a user reloads the page we will have kept the filtered view), this in turn triggers another event `handle_params` where we can grab the search and put it in the LiveView state, then when the next iteration of the update occurs it will filter the list. As we can see this is a responsive search field which once again to do using other Web Development techniques would have required a lot more effort through some JavaScript and an API endpoint in the project. 
 
-### Conclusions 
+# Conclusions 
 
 As I stated in the introduction, this is an example that you aren't very likely to do, however it is an example that demostrates the ability to write code that has background workers running, realtime updates to a browser, with interactive features such as a search textbox with very little amounts of code. 
 
