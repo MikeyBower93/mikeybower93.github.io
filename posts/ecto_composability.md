@@ -8,7 +8,7 @@ Over the past few years I have worked on quite a few projects that provide JSON 
 
 Before you know it you need to provide an API that is flexible to the client requesting the data. However a lot of implementations I have seen often end up working in an inefficent way, as it works on the request after the database query has executed. This can result in a tonne of results being returned from the database, followed by in memory filtering, or preloading of includes (`api/v1/rockets?[include]=space-center`) as its preparing the results. I wanted to work out a way that we could do this with a small amount of database requests ensuring the API stays efficent and reusable.
 
-To that end, I ended up creating a library that would parse the request, and generate a query that you could execute based on the parameters received, the library can be seen here: [https://github.com/MikeyBower93/json_api_ecto_builder](https://github.com/MikeyBower93/json_api_ecto_builder). 
+To that end, I ended up creating a library that would parse the request, and generate a query that you could execute based on the parameters received, the library can be seen [here](https://github.com/MikeyBower93/json_api_ecto_builder). 
 
 This blog will describe how Ecto allowed this to be achieved quite easily. 
 

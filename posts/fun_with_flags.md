@@ -182,7 +182,7 @@ defmodule LiveClocksWeb.LiveView.Clocks do
   end
 end
 ```
-A lot of the code here is mainly around general web development stuff, such as the HTML, filtering the results and handling query parameters. I won't go into the depth of each function as its not the purpose of this blog, additionally the purpose of this blog is not to explain how to develop with LiveView or how it works, great resources already exist for this such as the offical documentation [https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html), however I will highlight some of the key areas to demostrate how easy it is to get some of these features working.
+A lot of the code here is mainly around general web development stuff, such as the HTML, filtering the results and handling query parameters. I won't go into the depth of each function as its not the purpose of this blog, additionally the purpose of this blog is not to explain how to develop with LiveView or how it works, great resources already exist for this such as the [offical documentation](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html), however I will highlight some of the key areas to demostrate how easy it is to get some of these features working.
 
 - Much like the GenServer, when we get a socket connection to the browser we tell the process to update every half a second. 
 - When the the background job periodically updates, it asks the GenServer for the current time zones, this can be seen in the `handle_info(:update, socket)` function. Whats great about this is how efficent LiveView is as when it goes to re render the changes, it only sends new changes, and the packets it sends are very very small. This is why in this example, every time the second changes its able seamlessly update over 200 cities. This is great because this means we now have real time updates going to the browser frequently with very little amount of code, which using other means would have taken a lot of more work.
@@ -194,6 +194,6 @@ As I stated in the introduction, this is an example that you aren't very likely 
 
 I love how the full Elixir stack (Phoenix, Erlang, OTP) is allowing us to develop great features as developers with less code and effort, whilst being able to trust the technology it runs on given the mature OTP platform. 
 
-If you would like see the full code base for this the GitHub repository is: [https://github.com/MikeyBower93/live_clocks](https://github.com/MikeyBower93/live_clocks)
+If you would like see the full code base for this [here](https://github.com/MikeyBower93/live_clocks) is the repo.
 
 Happy Coding!

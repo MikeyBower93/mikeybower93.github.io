@@ -2,7 +2,7 @@
 
 # Introduction
 
-Anybody who has worked with Elixir Phoenix in the past few years will likely be aware of something called "Contexts". I won't go into the detail of what contexts are in this guide, and recommend reading [https://hexdocs.pm/phoenix/contexts.html](https://hexdocs.pm/phoenix/contexts.html) to get information into what contexts are. However at a base level, contexts take a leaf out of the domain driven development guide, and propose grouping code by related functionality. I also will not go into too much depth about why domain driven development is good idea in this guide, there are several resources out there to explain this, however at a base level if done correctly, it can lead to easy to reason about code, that is loosely coupled and maps directly to the business domain.
+Anybody who has worked with Elixir Phoenix in the past few years will likely be aware of something called "Contexts". I won't go into the detail of what contexts are in this guide, and recommend reading [this](https://hexdocs.pm/phoenix/contexts.html) to get information into what contexts are. However at a base level, contexts take a leaf out of the domain driven development guide, and propose grouping code by related functionality. I also will not go into too much depth about why domain driven development is good idea in this guide, there are several resources out there to explain this, however at a base level if done correctly, it can lead to easy to reason about code, that is loosely coupled and maps directly to the business domain.
 
 However, there are situations that arise when developing code this way that can lead to problems, and specifically highly coupled code which can lead to difficulties in maintainance, and also performance issues in some circumstances, in this post I will try and give an explanation of this problem, and how to mitigate against it.
 
@@ -12,7 +12,7 @@ I find that is always best to give concrete examples to illustrate a problem and
 
 At a basic level, companies likely have employees who make expenses which often have to be paid by the company. Historically this has been done using a shared card, of the employee paying with their own money and being reimbursed in their next payslip. This isn't a great experience, so in this example system, we want to a system where companies can be created, along with card holders (employees) and expenses can be stored. And the expenses can either be set as a company expense, or personal expense based on what the purchase was.
 
-To illustrate this example i have created a project called "PayStation" which you can see here [https://github.com/MikeyBower93/pay_station](https://github.com/MikeyBower93/pay_station). 
+To illustrate this example i have created a project called "PayStation" which you can see [here](https://github.com/MikeyBower93/pay_station). 
 
 ## PayStation Architecture
 
