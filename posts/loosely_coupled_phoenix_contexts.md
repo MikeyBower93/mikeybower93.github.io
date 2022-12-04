@@ -92,7 +92,7 @@ We then have a "GenServer" which runs on a 10 second schedule to fetch outstandi
 
 #### Expenses Context
 
-Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few ecto models representing companies, card holders and expenses. However we also have an `expenses_processor` which receives the Kafka messages as follows
+Similar to the Payments context we can see we have an "expenses" folder which groups the related expenses logic. In this we have a few Ecto models representing companies, card holders and expenses. However we also have an `expenses_processor` which receives the Kafka messages as follows
 
 ```elixir
 
@@ -130,6 +130,6 @@ Firstly, I want to point out that this is quite a crude example used to demonstr
 - Proper configuration of Kafka, with the right partitions etc.
 - Tests of course!
 
-Finally, I want to acknowledge and point out that of course including a fully fledged message queue such as Kafka creates an overhead of infrastructure maintainance. Although this is getting easier with managed services, to the point where you can even use Kafka in Heroku now, its important for you to balanace the complexity of the project, vs the need for such tools. However its important to note that, Phoenix is often considered a break away from the microservice pattern to a monolith pattern, this is for 2 reasons, one is due to its roots in the ruby community and the "Majestic Monolith" pattern, but also because of the sheer performance cababilities of elixir with OTP. Whilst this is understandable, its important for us to learn from the microservice patterns and what they solve, as it can apply to elixir monoliths aswell as we have just seen. Using something like Kafka also means if you did choose to split your elixir services, you will still retain the benefits as it can be used for cross service communication.
+Finally, I want to acknowledge and point out that of course including a fully fledged message queue such as Kafka creates an overhead of infrastructure maintainance. Although this is getting easier with managed services, to the point where you can even use Kafka in Heroku now, its important for you to balanace the complexity of the project, vs the need for such tools. However its important to note that, Phoenix is often considered a break away from the microservice pattern to a monolith pattern, this is for 2 reasons, one is due to its roots in the Ruby community and the "Majestic Monolith" pattern, but also because of the sheer performance cababilities of Elixir with OTP. Whilst this is understandable, its important for us to learn from the microservice patterns and what they solve, as it can apply to Elixir monoliths aswell as we have just seen. Using something like Kafka also means if you did choose to split your Elixir services, you will still retain the benefits as it can be used for cross service communication.
 
 Happy coding!
