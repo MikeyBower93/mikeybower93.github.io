@@ -1,3 +1,7 @@
+---
+mermaid: true
+---
+
 ## Welcome!
 
 Here is a list of my blog posts
