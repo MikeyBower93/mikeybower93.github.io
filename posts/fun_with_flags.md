@@ -196,4 +196,4 @@ I love how the full Elixir stack (Phoenix, Erlang, OTP) is allowing us to develo
 
 If you would like see the full code base for this [here](https://github.com/MikeyBower93/live_clocks) is the repo.
 
-Happy Coding!
+Happy coding!
