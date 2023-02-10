@@ -1,0 +1,36 @@
+# Distributed Patterns in Payments with Elixir
+
+# Introduction
+Recently I was reading [this](https://t.co/T6CjcTfn7g) excellent post by Jon Chew from Airbnb about how they achieve consistency, performance and correctness in their microservice architecture when dealing with payments internally. This got me reflecting on a number things, such as my personal experiences during my career with such problems, and also considering excellent books I had read about distributed systems such as Martin Kleppmann's "Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems" and Chris Richardson's "Microservices Patterns: With Examples in Java".
+
+I personally find that it can often be hard to piece together different information from blogs, books, small code examples etc to paint the full picture, this is unfortuantely true when trying to apply this to a language I'm passionate about (Elixir), as these examples are often in Java or Object Oriented heavy books. To that end, I wanted to create a fairly extensive example in Elixir about how you tie together these distributed patterns to achieve reliability and scalability in payments. The example is demonstrated in [this](https://github.com/MikeyBower93/ex_bank) repository called "ex_bank", this is to demonstrate a small banking application, where a customer can have an account, which has a balance, and that customer can send money from that account to someone via their sort code and account number, this in turn has to reduce the balance on our system, create a transaction, and notify a payment provider to send the money.
+
+# Considerations
+There are a number of considerations that need to be made in such an application, but before listing these, I want to lay out what "types" of considerations that are being made here, as any application can have a number of considerations, from scalability, to testing, to deployment etc, however we are dealing specifically with the questions around distributed systems here. To this end, I will demonstrate considerations that apply to 3 properties of a distributed system laid out in Martin Kleppmann's "Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems" which are as following
+- Reliability, specifically is the application fault tolerant?, how does it respond to faults?
+- Scalability, specifically can this application scale to a high load of traffic (high load often being hard to define)?
+- Maintainability, specifically is the application easy to maintain through its existance, whilst we won't cover this too much, it will be covered to some extent.
+
+## What We Will Consider
+- Idempotency, specifically no matter how many time you execute you the payment, you get the same result. 
+- Consistency, specifically ensuring that this payment and the many steps that occur within it (reducing the balance, creating a transaction, sending a request to a payment provider) happens atomically, put another way, this payment either completely happens or doesn't happen at all.
+- We also need to ensure consistency in the balance, we cannot let a customer spend money that they don't have.
+- Scalability, as described earlier, this is an application that can scale to a high load, but often defining this is hard, without putting some unverified number of payments per second etc here, I will simply describe scalability as the "effective" use of Postgres and Elixir, meaning that we are using those tools in the way they are intented, with the features they provide to providing good performance. To this end, we need to ensure that we ensure we avoid exhausting transactions by having them execute for longer than necessary (> ~100ms), and also avoid too much row locking to ensure we don't get any deadlocks.
+- Reliability, specifically when contacting the payment provider API, we need to deal with their system being down, potentially returning error responses, and even our system crashing mid payment.
+
+## What Isn't In Scope
+I want to ensure that anyone reading the application or this blog can take inspiration from the things that have had consideration put into them, but also not be mislead with things that haven't had too much consideration (I don't want people taking bad with the good), here are some things that haven't been considered, which you may want consider to in your own system
+- PPI and GDPR, storing payment data can be critical to get correct, ensure you store this data securely and wisely.
+- Tests, whilst I have creating some tests, these are acceptance tests that demonstrate an end to end flow to prove the application works as suggested, however there is a lot going on in this code, you will want to consider your tests more wisely including more unit tests to check the individual pieces.
+- General code architecture, whilst in general this follows the context/domain driven design structure, it is by no means perfect, for example there is quite a lot of logic in the Oban job.
+- More constraints/validation to ensure the correct formatting of data which could be achieved by Ecto, Postres constraints, or both.
+- This payment provider emulation is just an example, I can make no guarantee that a third party you integrate with offers API's like the one demonstrated, however I will say that if such a critical system is unreliable or not idempotent this could be a big issue, whilst some of these patterns demonstrated can help mitigate against things such as an the third party API having downtime, it cannot solve for everything, the applications we build are only as good as the systems we use.
+
+# Flow
+TODO - start with a diagram to illustrate the payment flow
+
+# Patterns
+TODO - list the patterns, what they solve with code examples
+
+# Conclusion
+TODO - round things up
