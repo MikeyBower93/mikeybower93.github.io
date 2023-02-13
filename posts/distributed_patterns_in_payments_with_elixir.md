@@ -226,7 +226,7 @@ This can be best described by the [Outbox Pattern](https://microservices.io/patt
 
 By using the outbox pattern, we make a reliability guarantee where we ensure our system will make an attempt to communicate with the payment provider in the future as part of the initial transaction.
 
-## Saga Pattern
+### Saga Pattern
 At this point, we should have a reliable and scalable Postgres transaction in our system, we should also understand that our system will use eventual consistency to ensure the payment provider sends the payment whilst also ensuring we keep the initial transaction efficent, this is achievable by using a background job processor and the outbox pattern. However, at this point we only have a pending transaction on our side, and a guarantee on our system that we will contact the payment provider. So where do we go from here? We can use the [Saga Pattern](https://microservices.io/patterns/data/saga.html) which is a way where we can manage transactions on multiple systems. Again in the post the context is slightly different, but the solution is the same whereby we are performing a transaction that spans multiple systems, and most crucially we will use the concept of a "compensating transaction" to deal with failures.
 
 Within the job we contact the provider to create the transaction (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/main/lib/ex_bank/payments/jobs/send_payment_via_provider.ex))
@@ -265,7 +265,7 @@ Whilst on face value this might seem like it isn'tideal, as a provider error (40
 
 This way we have achieved a distributed transaction across two systems, using a Saga approach.
 
-## Idempotency
+### Idempotency
 We have a few more things to consider before we can consider our eventual consistency comoplete. As stated throughout this post, reliability is key, to this extent we need to consider some edge cases. What happens if this job fails mid way through its execution? We know that failures are picked up by Oban and a retry mechanism is used. However there is even a deeper possible issue, Oban cannot solve for everything, its not impossible that we have a VM or container crash half way through execution whilst we are either in the middle of telling the payment provider to make the payment, or just after whilst we are updating our payment transaction. In this case, Oban will retry this job on recovery as it knows that it never completed, which means it will start from the beginning again (this is known as [at least once processing](https://www.cloudcomputingpatterns.org/at_least_once_delivery/)).
 
 We need to ensure that money isn't sent twice, so to this end we always need to check the payment provider first to see if the payment has already happened with the provider. By doing this we are ensuring our job is idempotent, so that if this job is executed again at any time, it will ensure a consistent state no matter how many times we execute this job. We do this by assigning a random UUID to our transaction during creation called `payment_idempotency_key` (see [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/lib/ex_bank/payments.ex#L108)).
@@ -361,14 +361,50 @@ end
 ```
 By doing this we have ensured reliability that should the payment attempt again, it won't create duplicates.
 
-## Distributed Transaction Conclusion
-We can now see with the use of eventual consistency, we can guarantee scalability of the initial transaction, and then apply patterns such as Idempotency, Saga's, and Outbox to ensure reliability when processing this payment with the provider.
+### Distributed Transaction Conclusion
+We can now see with the use of eventual consistency, we can guarantee scalability of the initial transaction, and then apply patterns such as Idempotency, the Saga Pattern, and the Outbox Pattern to ensure reliability when processing this payment with the provider.
 
-# Other Techniques Used
-- circuit breaker implemented with fuse, and then oban picks up these failures and retries with exponential backoff, an alternative approach is to impose a rate limit on our side via oban pro, with max jobs on a queue globally within a timespan https://hexdocs.pm/oban/2.11.0/smart_engine.html#usage-and-configuration
-- Indices
-- Constaints
-- Nuneric types  https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL
+## Other Techniques Used
+The previous sections are the main points around how scalability and reliability is achieved. However some additional techniques have been used to achieve relability and scalability, which I will discuss for completeness.
+
+### Circuit Breaker
+When hitting the payment provider over HTTP we have to deal with potential failures, such as 429 rate limiting. Should we hit a rate limit, that limit could apply for quite some time, the last thing we want to is to continue hitting the provider in quick succession, eating up our HTTP connection pool sending unnecessary requests to the payment provider, given the the possible latency to the payment provider, this could even slow down our Oban job queue if we have queue limits. To deal with this we can use the [Circuit Breaker Pattern](https://microservices.io/patterns/reliability/circuit-breaker.html) whereby we realise that we have hit an error such as 429, and automatically return the 429 error to the client for subsequent requests without hitting the provider until some time elapses.
+
+We do this using the [Fuse](https://github.com/jlouis/fuse) erlang library, along side [Tesla](https://hexdocs.pm/tesla/readme.html) which we use to make HTTP requests, which looks like this (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/main/lib/ex_bank/payments/clients/payment_provider_client.ex))
+```elixir
+defp client() do
+  api_key = Application.get_env(:ex_bank, :payment_provider_api_key)
+
+  middleware = [
+    {Tesla.Middleware.BaseUrl, "https://payment_provider"},
+    Tesla.Middleware.JSON,
+    {Tesla.Middleware.Headers, [{"api_key", api_key}]},
+    {Tesla.Middleware.Fuse,
+      opts: {{:standard, 2, 10_000}, {:reset, 60_000}},
+      keep_original_error: true,
+      should_melt: fn
+        {:ok, %{status: status}} when status in [429] -> true
+        {:ok, _} -> false
+        {:error, _} -> true
+      end,
+      mode: :sync}
+  ]
+
+  Tesla.client(middleware)
+end
+```
+
+One key thing to note here, is we could achieve this in a different way with Oban Pro, as you can set queue rate limits for a given timespan (see [here](https://hexdocs.pm/oban/2.11.0/smart_engine.html#usage-and-configuration)), which would guarantee we only fire x amount of requests to the payment provider within a particular time span, this could work well if we know our rate limits up front with the provider.
+
+### Indices
+TODO
+
+### Constaints
+TODO
+
+### Nuneric types
+TODO
+https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL
 
 # Conclusion
 How we have achieved reliability, scalability and maintainability through these patterns.
