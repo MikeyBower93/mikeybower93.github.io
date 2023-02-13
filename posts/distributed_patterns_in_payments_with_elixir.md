@@ -380,7 +380,7 @@ defp client() do
     Tesla.Middleware.JSON,
     {Tesla.Middleware.Headers, [{"api_key", api_key}]},
     {Tesla.Middleware.Fuse,
-      opts: /\{{:standard, 2, 10_000}, {:reset, 60_000}/\},
+      opts: /\}\}/:standard, 2, 10_000}, {:reset, 60_000/\}\}/,
       keep_original_error: true,
       should_melt: fn
         {:ok, %{status: status}} when status in [429] -> true
