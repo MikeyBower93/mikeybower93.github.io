@@ -27,7 +27,7 @@ I want to ensure that anyone reading the application or this blog can take inspi
 - This payment provider emulation is just an example, I can make no guarantee that a third party you integrate with offers API's like the one demonstrated, however I will say that if such a critical system is unreliable or not idempotent this could be a big issue, whilst some of these patterns demonstrated can help mitigate against things such as an the third party API having downtime, it cannot solve for everything, the applications we build are only as good as the systems we use.
 
 # Flow
-TODO - start with a diagram to illustrate the payment flow
+![](/images/distributed_patterns_in_payments_with_elixir_1.png)
 
 # Patterns
 TODO - list the patterns, what they solve with code examples
