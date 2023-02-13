@@ -23,11 +23,25 @@ I want to ensure that anyone reading the application or this blog can take inspi
 - PPI and GDPR, storing payment data can be critical to get correct, ensure you store this data securely and wisely.
 - Tests, whilst I have creating some tests, these are acceptance tests that demonstrate an end to end flow to prove the application works as suggested, however there is a lot going on in this code, you will want to consider your tests more wisely including more unit tests to check the individual pieces.
 - General code architecture, whilst in general this follows the context/domain driven design structure, it is by no means perfect, for example there is quite a lot of logic in the Oban job.
-- More constraints/validation to ensure the correct formatting of data which could be achieved by Ecto, Postres constraints, or both.
+- More constraints/validation to ensure the correct formatting of data which could be achieved by Ecto, Postgres constraints, or both.
 - This payment provider emulation is just an example, I can make no guarantee that a third party you integrate with offers API's like the one demonstrated, however I will say that if such a critical system is unreliable or not idempotent this could be a big issue, whilst some of these patterns demonstrated can help mitigate against things such as an the third party API having downtime, it cannot solve for everything, the applications we build are only as good as the systems we use.
 
 # Flow
-![](/images/distributed_patterns_in_payments_with_elixir_1.png)
+The state diagram defining the flow can be seen [here](/images/distributed_patterns_in_payments_with_elixir_1.png) (it doesn't fit on the blog screen).
+
+An overview of the complete flow is as follows:
+- When a payment is initiated we create a Postgres transaction, within that transaction we reduce the customer account balance, insert a payment transaction into our system, and then insert an Oban job to be executed later.
+- If any of those steps fail, the whole transaction is rolled back and therefore the payment is cancelled.
+- If they succeed, then the payment is pending.
+- The Oban job worker picks up the queued job and executes it.
+- The first step is to check if the payment has already been created by the provider (its not impossible that the job was executing previously, successful hit the payment provider, but during this process our VM crashed, at which the job will be started again, but from the payment providers point of view it was already successful), this can lead to 2 possible outcomes
+  - It already exists in the provider, in which case we just set our transaction to completed and we are done (payment complete).
+  - It does not exist, in which case we attempt to create it, the provider could result in different possible results
+    - If it returns a 400, we have sent it an invalid payment, in which case we mark the transaction as cancelled, and reinstate the balance to the customer account.
+    - If it returns a 429 or 500 error (and other possible errors), we know that this is temporary so we mark the job as failed, and assuming it hasn't exceeded the failed count, it will re-attempt the job with a backoff period.
+    - It returns 200, which means its successful and we can therefore mark the transaction as completed.
+- If any of the steps fail unexpectedly within the Oban job, this will also follow the failed/retry flow Oban provides.
+- Once the Oban job as completed, we can consider the payment complete.
 
 # Patterns
 TODO - list the patterns, what they solve with code examples
