@@ -371,6 +371,7 @@ The previous sections are the main points around how scalability and reliability
 When hitting the payment provider over HTTP we have to deal with potential failures, such as 429 rate limiting. Should we hit a rate limit, that limit could apply for quite some time, the last thing we want to is to continue hitting the provider in quick succession, eating up our HTTP connection pool sending unnecessary requests to the payment provider, given the the possible latency to the payment provider, this could even slow down our Oban job queue if we have queue limits. To deal with this we can use the [Circuit Breaker Pattern](https://microservices.io/patterns/reliability/circuit-breaker.html) whereby we realise that we have hit an error such as 429, and automatically return the 429 error to the client for subsequent requests without hitting the provider until some time elapses.
 
 We do this using the [Fuse](https://github.com/jlouis/fuse) erlang library, along side [Tesla](https://hexdocs.pm/tesla/readme.html) which we use to make HTTP requests, which looks like this (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/main/lib/ex_bank/payments/clients/payment_provider_client.ex))
+{% raw %}
 ```elixir
 defp client() do
   api_key = Application.get_env(:ex_bank, :payment_provider_api_key)
@@ -380,7 +381,7 @@ defp client() do
     Tesla.Middleware.JSON,
     {Tesla.Middleware.Headers, [{"api_key", api_key}]},
     {Tesla.Middleware.Fuse,
-      opts: /\}\}/:standard, 2, 10_000}, {:reset, 60_000/\}\}/,
+      opts: {{:standard, 2, 10_000}, {:reset, 60_000}},
       keep_original_error: true,
       should_melt: fn
         {:ok, %{status: status}} when status in [429] -> true
@@ -393,7 +394,7 @@ defp client() do
   Tesla.client(middleware)
 end
 ```
-
+{% endraw %}
 One key thing to note here, is we could achieve this in a different way with Oban Pro, as you can set queue rate limits for a given timespan (see [here](https://hexdocs.pm/oban/2.11.0/smart_engine.html#usage-and-configuration)), which would guarantee we only fire x amount of requests to the payment provider within a particular time span, this could work well if we know our rate limits up front with the provider.
 
 ### Indices
