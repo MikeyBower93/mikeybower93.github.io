@@ -415,7 +415,7 @@ One of my favourite talks on Postgres and Ecto is by Todd Resudek (see [here](ht
 
 We do this in our example by utilising unique indexes, non null checks, and foreign key indexes which can be seen in our migrations [here](https://github.com/MikeyBower93/ex_bank/tree/main/priv/repo/migrations).
 
-### Nuneric Types
+### Numeric Types
 Some people viewing this example might notice the use of decimals to store monetary amounts, and wonder about precision. Can we really guarantee a reliable system if we have inprecise data leading to issues when we do money comparisons or arithmetic? There are many ways to solve this, such as using the Elixir Money [library](https://hexdocs.pm/money/Money.html) which has Ecto data structures, through to storing money as integer values where the 2 trailing numbers represent the amount after the decimal point.
 
 However in this case we went with a simple solution whereby Postgres allows us to use the "numeric" datatype which allows us to store precision (see [here](https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL)). Whats nice about this is we are able to declare the type as "numeric" in our migration, but treat it as a decimal in our Ecto schemas.
