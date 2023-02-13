@@ -51,7 +51,7 @@ Arguably the most important reliability guarantee we can make in this system, is
 
 However whilst Postgres is ACID compliant, its very easy to fall into some potential issues, lets investigate theses one by one, and show how we can apply distributed patterns to solve them.
 
-**No ACID at All**
+### No ACID at All
 One possible troubled approach would be to use no ACID at all, and simply produce some code as follows
 ```elixir
 defp do_send_money(%CreatePaymentRequest{} = create_payment_request) do
@@ -72,7 +72,7 @@ This could easily lead to consistency issues as its not concurrency safe. Lets i
 - Both do greater than check and succeed (as both £40 or £20 is above £50).
 - Both subsequently update the balance and we have a negative balance which isn't allowed.
 
-**Long Running Transactions**
+### Long Running Transactions
 Given the non ACID approach isn't a solution, we can introduce transactions that provide us ACID guarantees, however there are some interesting concerns when using transactions, so its important to apply them correctly.
 
 Firstly, always [check what transaction isolation you need](https://www.postgresql.org/docs/current/transaction-iso.html), in our case (for reasons that will become clear soon) we are fine with the default which is read committed. However its easy to end up assuming things about transactions that might not hold true, read the documentation to ensure you use the correct approach.
@@ -115,7 +115,7 @@ end
 
 this would now mean we are performing network operations within the transaction which can be a big concern for scalability. You can even read about this in Jon Chew's Airbnb [post](https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb). Whilst this particular problem will be covered later in more depth, its easy to see how transactions can be misused.
 
-**Atomic Increments and Constraints**
+### Atomic Increments and Constraints
 A simple solution to ensure ACID guarantees in a scalable way is use a mix of [atomic increments](https://mbukowicz.github.io/databases/2020/05/03/simple-locking-use-cases-in-postgresql.html) and [Postgres check constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
 
 By using a check constraint in our database schema on the account we can do this (full code [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/priv/repo/migrations/20230202161530_create_accounts.exs#L15))
@@ -141,7 +141,7 @@ where id = $1
 ```
 This also doesn't provide inconsistency with other transactions, as we know that other transactions wanting to edit the same data will be locked until the completion of the transaction (see part 13.2.1 chapter 2 of [this](https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED) documentation).
 
-**Pairing with a Transaction**
+### Pairing with a Transaction
 By pairing this atomic increment and constraint check with a transaction, we guarantee a nice scalable ACID operation. Whereby we safety reduce the balance, create a transaction and prepare the payment job within one transaction which performs swiftly. We couple this together with Ecto's wonderful [Multi library](https://hexdocs.pm/ecto/Ecto.Multi.html) which allows us to create a nice clean pipeline approach to our transaction steps, like so (full code [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/lib/ex_bank/payments.ex#L107))
 ```elixir
 payment_idempotency_key = Ecto.UUID.generate()
@@ -159,7 +159,7 @@ end
 ```
 Please note that the `execute_masked_transaction` catches any constraint errors we receive from Postgres, such as negative balance, whilst its not ideal to do exception handling in Elixir, this is an atomic increment, which means we cannot make use of [Ecto's constraint check function](https://hexdocs.pm/ecto/Ecto.Changeset.html#check_constraint/3).
 
-**ACID Conclusion**
+### ACID Conclusion
 This summerises the first set of patterns that have been applied which includes
 - ACID
 - Atomic increments
