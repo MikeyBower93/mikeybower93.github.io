@@ -134,7 +134,7 @@ Ecto.Multi.update_all(
 )
 ``` 
 This performs a consistent update, which looks something like this in SQL which [safe for concurrency](https://mbukowicz.github.io/databases/2020/05/03/)
-```SQL
+```sql
 update accounts
 set balance = balance - $2
 where id = $1
@@ -157,7 +157,7 @@ Ecto.Multi.new()
   otherwise -> otherwise
 end
 ```
-Please note that the `execute_masked_transaction` catches any constraint errors we receive from Postgres, such as negative balance, whilst its not ideal to do exception handling in Elixir, this is an atomic increment, which means we cannot make use of [Ecto's constraint check function](https://hexdocs.pm/ecto/Ecto.Changeset.html#check_constraint/3).
+**Please note** that the `execute_masked_transaction` catches any constraint errors we receive from Postgres, such as negative balance, whilst its not ideal to do exception handling in Elixir, this is an atomic increment, which means we cannot make use of [Ecto's constraint check function](https://hexdocs.pm/ecto/Ecto.Changeset.html#check_constraint/3).
 
 ### ACID Conclusion
 This summerises the first set of patterns that have been applied which includes
@@ -171,15 +171,206 @@ By using these approaches and patterns we have guaranteed scalability, reliabili
 - maintainable as this doesn't require any bloated tools or libraries, its achievable within nothing more than Ecto Multis and Ecto Changesets.
 
 ## Distributed Transactions
-Expand on previous section about dual write issue, and how we use eventual consistency.
-Includes
-- dual write
-- eventual consistency
-- outbox pattern
-- sagas
+In the previous section I made these 2 following claims.
+1. "Its also important to us that if any step fails, whether that be communicating with the provider, creating the transaction or reducing the balance, non of these steps succeed, leaving our system in an inconsistent state.".
+2. "and if the payment fails in the creation of any steps the whole payment is cancelled.".
 
-Note how "and if the payment fails in the creation of any steps the whole payment is cancelled", isn't strictly true as we cannot for scalability reasons apply the provider request in the transaction, but with the use of eventual consistency, we make an eventual guarantee of a good state, the above transaction makes a promise that it will contact the provider through an oban job.
+However I also made this claim "its crucial that when we contact the payment provider, it does this as part of a distributed transaction, otherwise consistency could be a huge issue. Imagine a case where we reduce the balance, commit the transaction and try to hit the provider, which fails, we will have reduced the balance but failed in operating with the payment provider", whilst describing how doing this in a transaction can lead to significent scalability issues.
+
+At face value these two things seem mutually exclusive, on the one hand we need contact with this payment provider over HTTP to be part of the transaction, but this cannot easily happen because 1) its an external system, 2) this system has to be scalable and thus avoid HTTP calls whilst we are in operation of our database transaction. So how do we reconcile this?
+
+### Eventual Consistency
+In distributed systems, there is the concept of [eventual consistency](https://en.wikipedia.org/wiki/Eventual_consistency), essentially where the state of an application in a multi node system becomes consistency with the "true" state over time. When you read about eventual consistency you will see how it often is used to describe some NoSQL high available systems. However we can use this concept in our example, where we have 2 systems that need to be up to date with the state of the payment. Specifically our system, which has a balance and reference to the transaction, and the payment provider who needs to be aware of the payment to physically shift the funds. However there is no reason in this case that they both need to consistent in one atomic operation. We can simply make the system eventually consistent, by promising that both systems will be in sync with one another over time. 
+
+There are some distributed patterns we can apply here to ensure we have a reliable eventually consistent system. Firstly before delving into these patterns, lets discuss the bare minimum we must ensure at creation of a payment.
+- The balance has to be avaliable.
+- The balance has to be reduced, even though the payment itself will be eventual and not within the ACID transaction.
+- Mark the transaction on our side as pending, as given this eventually consistent approach, we make no certainty the transaction will even succeed.
+
+### Background Job Processing
+The next step we have taken to create an eventually consistent system is to use [Oban](https://github.com/sorentwo/oban). Oban is a reliable background job processing, where jobs can be queued and picked up by Oban and ensure strong reliability, this ensures uniqueness, specifically a unique job will only be ran by one node at once (but not exactly once processing, more on this later), it sits on top of Postgres which gives us consistency guarantees and also ensure we don't have to maintain additional systems, improving the maintainability of our payment system, its also [really performant and scalable](https://getoban.pro/articles/one-million-jobs-a-minute-with-oban).
+
+By using this we ensure relability that our payment provider will receive the payment, even in the face of faults, it also allows for scalability due to its great performance.
+
+### Outbox Pattern
+Even though we are using a background job processing, we need to meet our minimum initial consistency guarantees (specifically that the balance is reduced, the transaction is created in a pending state, and we ensure a payment to the provider will be attempted in the future). We could easily break these guarentees if we did something like the following.
+```elixir
+defp do_send_money(%CreatePaymentRequest{} = create_payment_request) do
+  payment_idempotency_key = Ecto.UUID.generate()
+
+  Ecto.Multi.new()
+  |> prepare_update_balance_step(create_payment_request)
+  |> prepare_create_transaction_step(payment_idempotency_key, create_payment_request)
+  |> execute_masked_transaction()
+  |> case do
+    {:ok, %{create_transaction: new_transaction}} -> 
+      # See here!
+      Oban.insert(SendPaymentViaProvider, ...job_args)
+      {:ok, new_transaction}
+    {:error, _step, %Ecto.Changeset{errors: errors}, _rest} -> {:error, errors}
+    otherwise -> otherwise
+  end
+end
+```
+This could cause an issue, as we reduced the balance, and created the payment transaction in a Postgres transaction, however we are creating the background job after this fact. Imagine a circumstance where the Postgres transaction succeeds, but the Oban job creation doesn't (some kind of failure). Now we have a system where we have a transaction in our system, and a reduced balance, but no guarantee the payment provider will do anything about this. This is often described as the [dual write](https://thorben-janssen.com/dual-writes/) issue, whereby you are trying update multiple systems, but something fails, and thus the system is in a failed state. Whilst we could use some kind of read repair, or write repair (see Conflict resolution [here](https://en.wikipedia.org/wiki/Eventual_consistency)), we have an easier way with Oban. As stated earlier it sits on top of Postgres, so it can take part in the same transaction like so.
+```elixir
+Ecto.Multi.new()
+|> prepare_update_balance_step(create_payment_request)
+|> prepare_payment_job_step(payment_idempotency_key, create_payment_request) #See here
+|> prepare_create_transaction_step(payment_idempotency_key, create_payment_request)
+|> execute_masked_transaction()
+```
+This can be best described by the [Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html), whilst the context in the post is a bit different, the solution is the same. Rather than hitting the payment provider after reducing the balance and creating the payment transaction, thus hitting a dual write issue, we tell Oban to queue this job within the same transaction, therefore we ensure its an all or nothing situation. Either a step fails, and everything is rolled back, including this eventual consistency step with the provider payment, or all steps succeed and we have guarenteed that Oban eventually will communicate with this payment provider.
+
+**Dont fear** if your unable to use a database based background job system (although they certainly make things simpler), its not uncommon for some of these systems to run on entirely different stores, such as [SQS](https://aws.amazon.com/sqs/) or [Sidekiq](https://www.google.com/search?q=sidekiq&oq=sidekiq&aqs=chrome..69i57j0i512l9.1980j0j4&sourceid=chrome&ie=UTF-8) (which uses Redis), you can use the Outbox Pattern here aswell, whereby you create an Outbox table in your database, insert into that table as part of the transaction with the arguments the job requires. And then use something like [Polling Publisher](https://microservices.io/patterns/data/polling-publisher.html) pattern, where you have a cron job that reads this table, and pushes any new items onto the given background job processor and then deletes it from the outbox.
+
+By using the outbox pattern, we make a reliability guarantee where we ensure our system will make an attempt to communicate with the payment provider in the future as part of the initial transaction.
+
+## Saga Pattern
+At this point, we should have a reliable and scalable Postgres transaction in our system, we should also understand that our system will use eventual consistency to ensure the payment provider sends the payment whilst also ensuring we keep the initial transaction efficent, this is achievable by using a background job processor and the outbox pattern. However, at this point we only have a pending transaction on our side, and a guarantee on our system that we will contact the payment provider. So where do we go from here? We can use the [Saga Pattern](https://microservices.io/patterns/data/saga.html) which is a way where we can manage transactions on multiple systems. Again in the post the context is slightly different, but the solution is the same whereby we are performing a transaction that spans multiple systems, and most crucially we will use the concept of a "compensating transaction" to deal with failures.
+
+Within the job we contact the provider to create the transaction (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/main/lib/ex_bank/payments/jobs/send_payment_via_provider.ex))
+```elixir
+%{
+  amount: amount,
+  account_id: account_id,
+  idempotency_key: payment_idempotency_key,
+  sender_account_number: sender_account_number,
+  sender_sort_code: sender_sort_code,
+  sender_account_name: sender_account_name,
+  receiver_account_number: receiver_account_number,
+  receiver_sort_code: receiver_sort_code,
+  receiver_account_name: receiver_account_name
+}
+|> PaymentProviderClient.create_transaction()
+|> case do
+  # Success, we can complete the transaction
+  %{status: status} when status in [200, 201] ->
+    {:ok, _} = Payments.complete_transaction(payment_idempotency_key)
+    :ok
+
+  # Bad request we need to fail and cancel the transaction.
+  %{status: status, body: error} when status in [400] ->
+    {:ok, _} = Payments.reverse_transaction(payment_idempotency_key, account_id, error)
+    :ok
+
+  # Unexpected case, oban to retry with error message for logging.
+  %{body: error} ->
+    {:error, error}
+end
+```
+We can see here that the job makes the attempt to contact the provider. Once we receive a response that we are willing to accept, we update the payment transaction on our side, to either set it as completed, or with the use of a "compensation transaction" (a Saga Pattern concept) where we realise the payment couldn't happen, so we reverse the transaction by reinstating the balance to the customer and setting our payment transaction to the failed state with an error message. 
+
+Whilst on face value this might seem like it isn'tideal, as a provider error (400 response) means we have to reverse out of the payment, its better than a system that cannot scale because we attempt to do this all within one Postgres transaction. Unfortuantely you cannot always have your cake and eat it in distributed systems, we have to make a trade off of the eventual consistency, to ensure reliability and scalability.
+
+This way we have achieved a distributed transaction across two systems, using a Saga approach.
+
+## Idempotency
+We have a few more things to consider before we can consider our eventual consistency comoplete. As stated throughout this post, reliability is key, to this extent we need to consider some edge cases. What happens if this job fails mid way through its execution? We know that failures are picked up by Oban and a retry mechanism is used. However there is even a deeper possible issue, Oban cannot solve for everything, its not impossible that we have a VM or container crash half way through execution whilst we are either in the middle of telling the payment provider to make the payment, or just after whilst we are updating our payment transaction. In this case, Oban will retry this job on recovery as it knows that it never completed, which means it will start from the beginning again (this is known as [at least once processing](https://www.cloudcomputingpatterns.org/at_least_once_delivery/)).
+
+We need to ensure that money isn't sent twice, so to this end we always need to check the payment provider first to see if the payment has already happened with the provider. By doing this we are ensuring our job is idempotent, so that if this job is executed again at any time, it will ensure a consistent state no matter how many times we execute this job. We do this by assigning a random UUID to our transaction during creation called `payment_idempotency_key` (see [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/lib/ex_bank/payments.ex#L108)).
+
+When we then create the transaction with the provider in the job, we send the ID as the idempotency key (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/lib/ex_bank/payments/jobs/send_payment_via_provider.ex#LL36C5-L47C50))
+```elixir
+%{
+  amount: amount,
+  account_id: account_id,
+  idempotency_key: payment_idempotency_key,
+  sender_account_number: sender_account_number,
+  sender_sort_code: sender_sort_code,
+  sender_account_name: sender_account_name,
+  receiver_account_number: receiver_account_number,
+  receiver_sort_code: receiver_sort_code,
+  receiver_account_name: receiver_account_name
+}
+|> PaymentProviderClient.create_transaction()
+```
+
+Then, when the job begins, we ensure we check to see if the payment already happened (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/main/lib/ex_bank/payments/jobs/send_payment_via_provider.ex))
+```elixir
+@impl Oban.Worker
+def perform(%Oban.Job{
+      args: args
+    }) do
+  # Check to see if the transaction already exists
+  # in cases of this job being cancelled due to a container crash
+  # half through the job
+  args = Map.new(args, fn {k, v} -> {String.to_existing_atom(k), v} end)
+
+  args.payment_idempotency_key
+  |> PaymentProviderClient.get_transaction()
+  |> maybe_send_money(args)
+end
+
+# Doesn't exist, so lets create payment with the provider
+defp maybe_send_money(%{status: 404}, %{
+        amount: amount,
+        account_id: account_id,
+        receiver_account_number: receiver_account_number,
+        receiver_sort_code: receiver_sort_code,
+        receiver_account_name: receiver_account_name,
+        payment_idempotency_key: payment_idempotency_key
+      }) do
+  %{
+    account_name: sender_account_name,
+    account_number: sender_account_number,
+    account_sort_code: sender_sort_code
+  } = Payments.get_account(account_id)
+
+  %{
+    amount: amount,
+    account_id: account_id,
+    idempotency_key: payment_idempotency_key,
+    sender_account_number: sender_account_number,
+    sender_sort_code: sender_sort_code,
+    sender_account_name: sender_account_name,
+    receiver_account_number: receiver_account_number,
+    receiver_sort_code: receiver_sort_code,
+    receiver_account_name: receiver_account_name
+  }
+  |> PaymentProviderClient.create_transaction()
+  |> case do
+    # Success, we can complete the transaction
+    %{status: status} when status in [200, 201] ->
+      {:ok, _} = Payments.complete_transaction(payment_idempotency_key)
+      :ok
+
+    # Bad request we need to fail and cancel the transaction.
+    %{status: status, body: error} when status in [400] ->
+      {:ok, _} = Payments.reverse_transaction(payment_idempotency_key, account_id, error)
+      :ok
+
+    # Unexpected case, oban to retry with error message for logging.
+    %{body: error} ->
+      {:error, error}
+  end
+end
+
+# Transaction already exists, lets just ensure its marked as completed.
+defp maybe_send_money(%{status: 200}, %{
+        payment_idempotency_key: payment_idempotency_key
+      }) do
+  {:ok, _} = Payments.complete_transaction(payment_idempotency_key)
+  :ok
+end
+
+# Unexpected case, oban to retry with error message for logging.
+defp maybe_send_money(%{body: error}, _data) do
+  {:error, error}
+end
+```
+By doing this we have ensured reliability that should the payment attempt again, it won't create duplicates.
+
+## Distributed Transaction Conclusion
+We can now see with the use of eventual consistency, we can guarantee scalability of the initial transaction, and then apply patterns such as Idempotency, Saga's, and Outbox to ensure reliability when processing this payment with the provider.
+
+# Other Techniques Used
+- circuit breaker implemented with fuse, and then oban picks up these failures and retries with exponential backoff, an alternative approach is to impose a rate limit on our side via oban pro, with max jobs on a queue globally within a timespan https://hexdocs.pm/oban/2.11.0/smart_engine.html#usage-and-configuration
+- Indices
+- Constaints
+- Nuneric types  https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL
 
 # Conclusion
-TODO - round things up
+How we have achieved reliability, scalability and maintainability through these patterns.
 Distributed patterns in Elixir monoliths still being relevant.
+Listing of the patterns.
