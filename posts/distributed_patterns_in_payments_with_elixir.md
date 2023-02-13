@@ -397,17 +397,51 @@ end
 {% endraw %}
 One key thing to note here, we could achieve this in a different way with Oban Pro, as you can set queue rate limits for a given timespan (see [here](https://hexdocs.pm/oban/2.11.0/smart_engine.html#usage-and-configuration)), which would guarantee we only fire x amount of requests to the payment provider within a particular time span, this could work well if we know our rate limits up front with the provider.
 
-### Indices
-TODO
+### Indexes
+Although this is quite simple and common advice, it cannot be understated, make sure you index your tables correctly! This ensures as the data grows over time, we can select data performantly. The indexes we created in this case can be seen in our migrations [here](https://github.com/MikeyBower93/ex_bank/tree/main/priv/repo/migrations). Whilst indexes are created automatically for primary keys, in our application we have some other access paths, for example selecting the transaction by `payment_idempotency_key` for example (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/lib/ex_bank/payments.ex#L53))
+```elixir
+transaction = Repo.get_by!(Transaction, payment_idempotency_key: idempotency_key)
+```
+
+the index can be seen as follows (see full code [here](https://github.com/MikeyBower93/ex_bank/blob/1d133e21b350b304be2d98e84364451ef4a89153/priv/repo/migrations/20230202161959_create_transactions.exs#L20))
+```elixir
+create index(:transactions, [:payment_idempotency_key])
+```
+
+Its very hard to give clear advise on indexing, as the right indexes, and index types depends on the way you utilise the data in the application. So its on a case by case circumstance, however I recommend reading [use the index luke](https://use-the-index-luke.com/) for good guidance around this topic. By creating indexes we ensure non linear performance, so as the data grows significently, our application stays performant ensuring scalability.
 
 ### Constaints
-TODO
+One of my favourite talks on Postgres and Ecto is by Todd Resudek (see [here](https://www.youtube.com/watch?v=mliO5_XhAKE&t=711s&ab_channel=ElixirConf)), the talk goes into more ways to utilise Postgres instead of building things at the application code level. One points he makes in the post is the "belts and suspenders" approach to data validation. Essentially that its quite common to verify data at multiple levels, all the way from the user form, through the the application code. However in my experience it often seems forgotten to be applied at the database level. Which in my view is the most important place to provide validation, as it ensure data consistency independant of how data is modified into your system. This provides a greater level of reliability ensuring that our data is valid at the root level of our data.
 
-### Nuneric types
-TODO
-https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL
+We do this in our example by utilising unique indexes, non null checks, and foreign key indexes which can be seen in our migrations [here](https://github.com/MikeyBower93/ex_bank/tree/main/priv/repo/migrations).
+
+### Nuneric Types
+Some people viewing this example might notice the use of decimals to store monetary amounts, and wonder about precision. Can we really guarantee a reliable system if we have inprecise data leading to issues when we do money comparisons or arithmetic? There are many ways to solve this, such as using the Elixir Money [library](https://hexdocs.pm/money/Money.html) which has Ecto data structures, through to storing money as integer values where the 2 trailing numbers represent the amount after the decimal point.
+
+However in this case we went with a simple solution whereby Postgres allows us to use the "numeric" datatype which allows us to store precision (see [here](https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL)). Whats nice about this is we are able to declare the type as "numeric" in our migration, but treat it as a decimal in our Ecto schemas.
 
 # Conclusion
-How we have achieved reliability, scalability and maintainability through these patterns.
-Distributed patterns in Elixir monoliths still being relevant.
-Listing of the patterns.
+In this post I have tried to take a real problem, such as making payments with several system, which could be applied to e-commerce sites through to fintech companies, and explain how we can apply distributed patterns to make it reliable, scalable and cover some topics around maintainability (although a lot more could be discussed around that) using Elixir.
+
+The reliability patterns/techniques we covered are
+- ACID transactions
+- Atomic increments
+- The Outbox Pattern
+- The Saga Pattern
+- The Circuit Breaker Pattern
+- Idempotency
+- Background job processors
+- Postgres constraints and data types
+- Eventual consistency
+
+The scalability patterns/techniques we covered are
+- Indexes
+- Eventual consistency
+- Avoiding long running transactions
+- Performant background job processors 
+
+Whilst we didn't apply any particular patterns to maintainability, throughout this post I have tried to apply these patterns with as much simplicity as possible and achieved most of this with just Elixir libraries and Postgres. Maintainability is a big topic, but hopefully this can demonstrate how simplicity doesn't have to come at the cost of scalability or reliability.
+
+One parting thought I would like to make is not unlike my point in my [previous post](/posts/loosely_coupled_phoenix_contexts.md). Specifically that on quite a few occasions I've seen a rejection of the need for microservices when using Elixir (this is just based on some conversations I've seen and had, this may not be the majority view), whilst this post is not to comment on that conversation, its to reiterate that behind both approaches (microservices, and monoliths) we are dealing with distributed systems. Even within a monolith we are often communicating with a database and external systems, to such an end we can say that despite the architectural approach, both require use of distributed patterns. We should continue to learn from different architectural approaches in the community, and consider how such approaches can help us better our own.
+
+Happy Coding!
