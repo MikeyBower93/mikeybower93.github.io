@@ -40,8 +40,8 @@ An overview of the complete flow is as follows:
     - If it returns a 400, we have sent it an invalid payment, in which case we mark the transaction as cancelled, and reinstate the balance to the customer account.
     - If it returns a 429 or 500 error (and other possible errors), we know that this is temporary so we mark the job as failed, and assuming it hasn't exceeded the failed count, it will re-attempt the job with a backoff period.
     - It returns 200, which means its successful and we can therefore mark the transaction as completed.
-- If any of the steps fail unexpectedly within the Oban job, this will also follow the failed/retry flow Oban provides.
-- Once the Oban job as completed, we can consider the payment complete.
+- If any of the steps fail unexpectedly within the Oban job, this will also follow the failed/retry flow Oban provides (this is omitted from the diagram to reduce bloating the diagram, and because its an Oban guarantee).
+- Once the Oban job as completed, we can consider the payment complete, however if it was a 400 error its considered cancelled.
 
 # Patterns
 TODO - list the patterns, what they solve with code examples
